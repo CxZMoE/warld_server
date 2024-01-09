@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net"
 
 	"github.com/CxZMoE/warld_server/m/nova"
@@ -27,6 +28,7 @@ func check_register_player(p_id string, addr net.UDPAddr) (bool, error) {
 			},
 			Name: p_id,
 		}
+		log.Println("add player:", p_id)
 		return true, nil
 	}
 	return false, fmt.Errorf("player with name: %s already exists", p_id)

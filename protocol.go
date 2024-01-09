@@ -1,6 +1,10 @@
 package main
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+)
 
 const (
 	// 添加玩家
@@ -16,14 +20,18 @@ const (
 )
 
 const (
-	FRAME_HEAD = 0xfb
-	FRAME_END  = 0xff
+	FRAME_HEAD = 0xff
+	FRAME_END  = 0xfb
 )
 
 var dispatch_pool map[string](chan []byte)
 
-func init_player_dispatch(p_id string) {
+func init_dispatch_pool() {
 	dispatch_pool = make(map[string]chan []byte)
+}
+
+func init_player_dispatch(p_id string) {
+	dispatch_pool[p_id] = make(chan []byte, 0xff)
 }
 
 func get_frame_cmd(frame []byte) int {
@@ -39,10 +47,12 @@ func make_package(cmd_id uint8, data []byte) []byte {
 	switch cmd_id {
 	case WD_CMD_GET_MATCH_INFO:
 		frame = make([]byte, 0, 256)
-		frame[0] = FRAME_HEAD
-		frame[1] = WD_CMD_GET_MATCH_INFO
-		frame[2] = byte(data_size << 8)
-		frame[3] = byte(data_size & 0x0f)
+		frame = append(frame,
+			FRAME_HEAD,
+			WD_CMD_GET_MATCH_INFO,
+			byte(data_size<<8),
+			byte(data_size&0x0f),
+		)
 		if data_size != 0 {
 			frame = append(frame, data...)
 		}
@@ -53,10 +63,18 @@ func make_package(cmd_id uint8, data []byte) []byte {
 
 func process_get_match_info(p_id string) error {
 	if _, ok := dispatch_pool[p_id]; !ok {
-		return fmt.Errorf("p_id not exists")
+		return fmt.Errorf("p_id: %s not found in dispatch pool", p_id)
 	}
 	if len(dispatch_pool[p_id]) < 0xff {
-		dispatch_pool[p_id] <- make_package(WD_CMD_GET_MATCH_INFO, nil)
+		player_list_data, err := json.Marshal(players)
+		if err != nil {
+			return err
+		}
+
+		log.Println("dispatch msg:", string(player_list_data))
+		dispatch_pool[p_id] <- make_package(WD_CMD_GET_MATCH_INFO, player_list_data)
+	} else {
+		log.Println("length of dispatch_pool:", len(dispatch_pool[p_id]))
 	}
 	return nil
 }

@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"fmt"
+	"log"
 	"net"
 
 	"github.com/CxZMoE/warld_server/m/nova"
@@ -29,10 +31,11 @@ var (
 )
 
 func NewGameServer(port int) {
+	init_dispatch_pool()
 	init_player_management()
 
 	conn, err := net.ListenUDP("udp4", &net.UDPAddr{
-		IP:   net.IPv4(0, 0, 0, 0),
+		IP:   net.IPv4(127, 0, 0, 1),
 		Port: port,
 	})
 	if err != nil {
@@ -53,16 +56,23 @@ func NewGameServer(port int) {
 			// 检查并加入玩家
 			p_id := addr.IP.String()
 			check_register_player(p_id, *addr)
-
+			init_player_dispatch(p_id)
 			// 检查数据帧
 			{
+				frame := buf[:n]
+				log.Println("received frame:", frame)
 				// 检查帧格式正确
-				if bytes.HasPrefix(buf, []byte{FRAME_HEAD}) && bytes.HasSuffix(buf, []byte{FRAME_END}) {
-					cmd_id := get_frame_cmd(buf)
+				if bytes.HasPrefix(frame, []byte{FRAME_HEAD}) && bytes.HasSuffix(frame, []byte{FRAME_END}) {
+					log.Println("precess frame:", frame)
+					cmd_id := get_frame_cmd(frame)
+					log.Println("process frame command:", cmd_id)
 					switch cmd_id {
 					case WD_CMD_GET_MATCH_INFO:
-						process_get_match_info(p_id)
-
+						log.Println("WD_CMD_GET_MATCH_INFO")
+						err := process_get_match_info(p_id)
+						if err != nil {
+							panic(err)
+						}
 					}
 				}
 			}
@@ -71,4 +81,10 @@ func NewGameServer(port int) {
 			dispatch_game_msg()
 		}
 	}()
+}
+
+func main() {
+	NewGameServer(9010)
+	log.Println("server started")
+	fmt.Scanln()
 }
